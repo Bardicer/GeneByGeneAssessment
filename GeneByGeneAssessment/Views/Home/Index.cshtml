@@ -1,0 +1,159 @@
+﻿
+<div ng-app="gbg">
+    <div ng-controller="samples">
+        <div class="col-xs-12">
+            <br/>
+            <br/>
+            <button class="btn btn-primary" ng-click="showSearchSamples()">Search Samples</button>
+            <button class="btn btn-success" ng-click="showInsertSample()">Insert New Sample</button>
+            <br />
+            <br/>
+            @*<select class="form-control" style="display: inline-block;" ng-model="selectedUser" ng-options="(x.lastName + ', ' + x.firstName) for x in users">
+                <option value="" selected="selected">All Users</option>
+            </select>*@
+            <div ng-show="showSearch">
+                <input type="text" ng-model="query" placeholder="Search by user name..." class="form-control" style="display: inline-block;" />
+                <select class="form-control" style="display: inline-block;" ng-model="selectedStatus" ng-options="x.statusName for x in statuses">
+                    <option value="" selected="selected">All Statuses</option>
+                </select>
+                <button class="btn btn-primary" ng-click="getSamples()">Search</button>
+            </div>
+            <br/>
+            <br/>
+        </div>
+        <table class="table table-responsive table-hover table-condensed" ng-if="showTable">
+            <thead>
+                <tr>
+                    <th>ID</th>
+                    <th>Barcode</th>
+                    <th>Created By</th>
+                    <th>Created Date</th>
+                    <th>Status</th>
+                </tr>
+            </thead>
+            <tbody>
+                <tr ng-repeat="sample in samples">
+                    <td>{{sample.sampleId}}</td>
+                    <td>{{sample.barcode}}</td>
+                    <td>{{sample.creator.lastName}}, {{sample.creator.firstName}}</td>
+                    <td>{{sample.createdAt | date: 'MMM dd, yyyy' }}</td>
+                    <td>{{sample.status.statusName}}</td>
+                </tr>
+            </tbody>
+        </table>
+        <div ng-show="showInsertForm">
+           <div class="form-horizontal">
+               <h3>Insert New Sample Information</h3>
+               <div class="form-group">
+                   <label for="barcode" class="col-xs-1">Barcode:</label>
+                   <input type="text" name="barcode" class="form-control col-xs-11" style="display: inline-block;" ng-model="barcode"/>
+               </div>
+               <div class="form-group">
+                   <label for="user" class="col-xs-1">User:</label>
+                   <select class="form-control col-xs-11" style="display: inline-block;" ng-model="selectedUser" ng-options="(x.lastName + ', ' + x.firstName) for x in users">
+                       <option value="">Select a user...</option>
+                   </select>
+               </div>
+              <div class="form-group">
+                   <label for="status" class="col-xs-1">Status:</label>
+                   <select class="form-control col-xs-11" style="display: inline-block;" ng-model="selectedStatus" ng-options="x.statusName for x in statuses">
+                       <option value="" selected="selected">Choose a status...</option>
+                   </select>
+               </div>
+               
+               <button class="btn btn-primary" ng-click="submitInsertSample()">Insert Sample</button>
+           </div>
+        </div>
+    </div>
+</div>
+
+@section scripts {
+    <script>
+        var app = angular.module('gbg', []);
+
+        app.controller('samples', ['$scope', '$http', '$location', function ($scope, $http, $location) {            
+            $scope.statuses = [];
+            $scope.users = [];
+            $scope.samples = [];
+
+            $scope.selectedUser = null;
+            $scope.selectedStatus = null;
+            $scope.query = null;
+            $scope.barcode = null;
+
+            $scope.showTable = false;
+            $scope.showInsertForm = false;
+            $scope.showSearch = true;            
+
+            $http.get('api/Status').then(function (response) {
+                $scope.statuses = response.data;
+            });
+
+            $http.get('api/Users').then(function (response) {
+                $scope.users = response.data;               
+            });
+
+            $scope.showSearchSamples = function () {
+                $scope.showSearch = true;
+                $scope.showTable = false;
+                $scope.showInsertForm = false;
+                $scope.query = null;
+                $scope.selectedUser = null;
+                $scope.selectedStatus = null;
+            }
+
+            $scope.getSamples = function () {
+                var data = {
+                    UserId: $scope.selectedUser != null ? $scope.selectedUser.userId : null,
+                    Query: $scope.query,
+                    StatusId: $scope.selectedStatus != null ? $scope.selectedStatus.statusId : null
+                }
+
+                $http.post('/api/Samples/GetSamples', data)
+                    .then(function (response) {
+                        $scope.samples = response.data;
+                        $scope.showTable = $scope.samples.length > 0;
+                    });
+            }
+
+            $scope.showInsertSample = function () {
+                $scope.showTable = false;
+                $scope.showInsertForm = true;
+                $scope.showSearch = false;
+                $scope.selectedStatus = null;
+                $scope.selectedUser = null;
+                $scope.query = null;  
+            }
+
+            $scope.submitInsertSample = function () {
+                if ($scope.selectedStatus == null) {
+                    toastr.error('Sample status must be selected.');
+                    return;
+                }
+
+                if ($scope.selectedUser == null) {
+                    toastr.error('User must be selected.');
+                    return;
+                }
+
+                var data = {
+                    Barcode: $scope.barcode,
+                    CreatedBy: $scope.selectedUser.userId,
+                    StatusId: $scope.selectedStatus.statusId
+                };
+
+                $http.post('/api/Samples/InsertSample', data).then(function (response) {
+                    if (response.status == 200 || response.status == 201) {
+                        toastr.success('Sample was successfully added with ID: ' + response.data.sampleId);
+                        return;
+                    }                    
+                }, function (response) { 
+                    if (response.status == 500) {
+                        toastr.error('An error occurred during the insertion, please try again.');
+                        return;
+                    }
+                });
+            }
+        }]);
+    </script>
+}
